@@ -21,6 +21,7 @@ on:
 jobs:
   scrape:
     runs-on: ubuntu-latest
+    environment: my-env
     env:
       ANNOUNCE_DAYS: ${{ github.event.inputs.announce_days || '3' }}
       CLOSING_DAYS: ${{ github.event.inputs.closing_days || '30' }}
