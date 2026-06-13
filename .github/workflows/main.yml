@@ -1,0 +1,87 @@
+name: ESA Tender Scrape
+
+on:
+  workflow_dispatch:
+    inputs:
+      announce_days:
+        description: 'Days back for the announcement date filter'
+        required: false
+        default: '3'
+      closing_days:
+        description: 'Days ahead for the closing date filter'
+        required: false
+        default: '30'
+      include_cDateF:
+        description: 'Include cDateF filter (0 or 1)'
+        required: false
+        default: '0'
+  schedule:
+    - cron: '0 6 * * 1-5'
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    env:
+      ANNOUNCE_DAYS: ${{ github.event.inputs.announce_days || '3' }}
+      CLOSING_DAYS: ${{ github.event.inputs.closing_days || '30' }}
+      INCLUDE_CDATEF: ${{ github.event.inputs.include_cDateF || '0' }}
+      SMTP_HOST: ${{ secrets.SMTP_HOST }}
+      SMTP_PORT: ${{ secrets.SMTP_PORT }}
+      SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+      EMAIL_TO: ${{ secrets.EMAIL_TO }}
+      EMAIL_SUBJECT: 'ESA tender results'
+      SMTP_STARTTLS: '1'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++ libssl-dev libasio-dev python3
+
+      - name: Build
+        working-directory: esastar
+        run: |
+          g++ query.cpp -o query.out -std=c++20 -pthread -lssl -lcrypto
+
+      - name: Run scraper
+        working-directory: esastar
+        run: |
+          ./query.out "$ANNOUNCE_DAYS" "$CLOSING_DAYS" "$INCLUDE_CDATEF" | tee tender_results.txt
+
+      - name: Send email
+        working-directory: esastar
+        run: |
+          python3 - <<'PY'
+          import os
+          import smtplib
+          import ssl
+          from email.message import EmailMessage
+          from pathlib import Path
+
+          host = os.environ["SMTP_HOST"]
+          port = int(os.environ.get("SMTP_PORT", "587"))
+          username = os.environ["SMTP_USERNAME"]
+          password = os.environ["SMTP_PASSWORD"]
+          sender = os.environ["EMAIL_FROM"]
+          recipient = os.environ["EMAIL_TO"]
+          subject = os.environ.get("EMAIL_SUBJECT", "ESA tender results")
+          body = Path("tender_results.txt").read_text(encoding="utf-8", errors="replace")
+
+          message = EmailMessage()
+          message["From"] = sender
+          message["To"] = recipient
+          message["Subject"] = subject
+          message.set_content(body if body.strip() else "No results returned.")
+
+          context = ssl.create_default_context()
+          with smtplib.SMTP(host, port) as client:
+              if os.environ.get("SMTP_STARTTLS", "1") == "1":
+                  client.starttls(context=context)
+              if username:
+                  client.login(username, password)
+              client.send_message(message)
+          PY
