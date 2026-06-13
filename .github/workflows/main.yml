@@ -43,17 +43,14 @@ jobs:
           sudo apt-get install -y g++ libssl-dev libasio-dev python3
 
       - name: Build
-        working-directory: esastar
         run: |
           g++ query.cpp -o query.out -std=c++20 -pthread -lssl -lcrypto
 
       - name: Run scraper
-        working-directory: esastar
         run: |
           ./query.out "$ANNOUNCE_DAYS" "$CLOSING_DAYS" "$INCLUDE_CDATEF" | tee tender_results.txt
 
       - name: Send email
-        working-directory: esastar
         run: |
           python3 - <<'PY'
           import os
