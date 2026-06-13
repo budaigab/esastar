@@ -60,7 +60,7 @@ jobs:
           from pathlib import Path
 
           host = os.environ["SMTP_HOST"]
-          port = int(os.environ.get("SMTP_PORT", "587"))
+          port = int(os.environ.get("SMTP_PORT") or "587")
           username = os.environ["SMTP_USERNAME"]
           password = os.environ["SMTP_PASSWORD"]
           sender = os.environ["EMAIL_FROM"]
