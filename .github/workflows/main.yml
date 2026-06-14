@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       announce_days:
-        description: 'Days back for the announcement date filter'
+        description: 'Days back for the announcement date filter (0 = auto: Mon 3, other weekdays 1)'
         required: false
-        default: '3'
+        default: '0'
       closing_days:
         description: 'Days ahead for the closing date filter'
         required: false
@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: my_env
     env:
-      ANNOUNCE_DAYS: ${{ github.event.inputs.announce_days || '3' }}
+      ANNOUNCE_DAYS: ${{ github.event.inputs.announce_days || '0' }}
       CLOSING_DAYS: ${{ github.event.inputs.closing_days || '30' }}
       INCLUDE_CDATEF: ${{ github.event.inputs.include_cDateF || '0' }}
       SMTP_HOST: ${{ secrets.SMTP_HOST }}
@@ -68,6 +68,7 @@ jobs:
           recipient = os.environ["EMAIL_TO"]
           subject = os.environ.get("EMAIL_SUBJECT", "ESA tender results")
           body = Path("tender_results.txt").read_text(encoding="utf-8", errors="replace")
+          body = body.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "\r\n")
 
           message = EmailMessage()
           message["From"] = sender

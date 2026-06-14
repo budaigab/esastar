@@ -11,7 +11,8 @@
 using asio::ip::tcp;
 
 struct TenderItem {
-    std::string idEra;
+    std::string id;
+    std::string title;
     std::string description;
 };
 
@@ -204,14 +205,33 @@ std::string build_query_path(const QuerySpec& query, int announce, int close, bo
     return path;
 }
 
+std::string build_tender_link(const QuerySpec& query, const TenderItem& item) {
+    if (query.endpoint == "/api/nonESATA/filter/50") {
+        return "https://esastar-publication-ext.sso.esa.int/nonEsaTenderActions/details/" + item.id;
+    }
+
+    return "https://esastar-publication-ext.sso.esa.int/ESATenderActions/details/" + item.id;
+}
+
+int default_announcement_days() {
+    time_t timestamp = time(NULL);
+    struct tm datetime = *localtime(&timestamp);
+
+    if (datetime.tm_wday == 1) {
+        return 3;
+    }
+
+    return 1;
+}
+
 class scraper {
     public:
         scraper(int announce, int close, bool include_cDateF = false)
             : announce(announce), close(close), include_cDateF(include_cDateF) {
             queries = {
-                {"tenderAction_t5", "/api/tenderAction/filter/50", "5"},
-                {"tenderAction_t7", "/api/tenderAction/filter/50", "7"},
-                {"nonESATA_t5", "/api/nonESATA/filter/50", "5"}
+                {"Tender Actions - Open Competition", "/api/tenderAction/filter/50", "5"},
+                {"Tender Actions - Call for Proposals", "/api/tenderAction/filter/50", "7"},
+                {"Non ESA Tender Actions - Open Competition", "/api/nonESATA/filter/50", "5"}
             };
 
             try {
@@ -306,9 +326,10 @@ class scraper {
 
             for (const std::string& item_object : extract_item_objects(body)) {
                 TenderItem item;
-                item.idEra = extract_json_value(item_object, "\"idEra\"");
+                item.id = extract_json_value(item_object, "\"id\"");
+                item.title = extract_json_value(item_object, "\"title\"");
                 item.description = extract_json_value(item_object, "\"description\"");
-                if (!item.idEra.empty()) {
+                if (!item.id.empty()) {
                     result.items.push_back(item);
                 }
             }
@@ -322,11 +343,14 @@ class scraper {
 
             for (const QueryResult& result : results) {
                 grand_total += result.total;
-                std::cout << "\n[" << result.query.label << "] total: " << result.total << "\n";
+                std::cout << "\n=== " << result.query.label << " ===\n";
+                std::cout << "Total: " << result.total << "\n";
 
                 for (const TenderItem& item : result.items) {
-                    std::cout << item.idEra << " | " << item.description << "\n";
-                    std::cout << "https://esastar-publication-ext.sso.esa.int/ESATenderActions/details/" << item.idEra << "\n";
+                    std::cout << "ID: " << item.id << "\n";
+                    std::cout << "Title: " << item.title << "\n";
+                    std::cout << "Description: " << item.description << "\n";
+                    std::cout << "Link: " << build_tender_link(result.query, item) << "\n\n";
                 }
             }
 
@@ -336,7 +360,7 @@ class scraper {
         void run() {
             std::cout << "1st argument: number of days back to use in announcement date filter. Using: " << announce << "\n";
             std::cout << "2nd argument: number of days ahead to use in closing date filter. Using: " << close << "\n";
-            std::cout << "cDateF filter: " << (include_cDateF ? "enabled" : "disabled") << "\n";
+            std::cout << "3rd argument: closing date filter usage. Using: " << (include_cDateF ? "enabled" : "disabled") << "\n";
 
             for (const QuerySpec& query : queries) {
                 std::string path = build_query_path(query, announce, close, include_cDateF);
@@ -350,12 +374,15 @@ class scraper {
 };
 
 int main(int argc, char* argv[]) {
-    int announcement = 3;
+    int announcement = default_announcement_days();
     int closing = 30;
     bool include_cDateF = false;
 
     if (argc > 1) {
-        announcement = atoi(argv[1]);
+        int requested_announcement = atoi(argv[1]);
+        if (requested_announcement > 0) {
+            announcement = requested_announcement;
+        }
     }
     if (argc > 2) {
         closing = atoi(argv[2]);
