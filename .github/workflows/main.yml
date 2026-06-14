@@ -74,7 +74,7 @@ jobs:
           message["From"] = sender
           message["To"] = recipient
           message["Subject"] = subject
-          message.set_content(body if body.strip() else "No results returned.")
+          message.set_content(body if body.strip() else "No results returned.", subtype="plain", charset="utf-8")
 
           context = ssl.create_default_context()
           try:
