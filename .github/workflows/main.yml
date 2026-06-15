@@ -16,7 +16,7 @@ on:
         required: false
         default: '0'
   schedule:
-    - cron: '0 6 * * 1-5'
+    - cron: '*/5 * * * *' #'0 6 * * 1-5'
 
 jobs:
   scrape:
