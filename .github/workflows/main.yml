@@ -15,8 +15,11 @@ on:
         description: 'Include cDateF filter (0 or 1)'
         required: false
         default: '0'
+  repository_dispatch:
+    types:
+      - esastar_run
   schedule:
-    - cron: '51 5 * * 1-5'
+    - cron: '0 6 * * 1-5'
 
 jobs:
   scrape:
