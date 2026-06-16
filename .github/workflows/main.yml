@@ -16,8 +16,7 @@ on:
         required: false
         default: '0'
   repository_dispatch:
-    types:
-      - esastar_run
+    types: [esastar_run]
   schedule:
     - cron: '0 6 * * 1-5'
 
