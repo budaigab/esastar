@@ -17,8 +17,9 @@ on:
         default: '0'
   repository_dispatch:
     types: [esastar_run]
-  schedule:
-    - cron: '0 6 * * 1-5'
+  # # schedule unreliable
+  # schedule:
+  #   - cron: '51 5 * * 1-5'
 
 jobs:
   scrape:
