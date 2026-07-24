@@ -278,7 +278,14 @@ class scraper {
             asio::write(ssl_socket, asio::buffer(request));
 
             asio::streambuf response;
-            asio::read_until(ssl_socket, response, "\r\n");
+            asio::error_code ec;
+            asio::read_until(ssl_socket, response, "\r\n", ec);
+            if (ec) {
+                std::cerr << "Network error: could not read the HTTP status line from "
+                          << host << ". The site may be unreachable or reset the connection. "
+                          << "Details: " << ec.message() << std::endl;
+                throw std::runtime_error("Unable to reach " + host + " while reading the HTTP status line");
+            }
 
             std::istream response_stream(&response);
             std::string http_version;
@@ -292,19 +299,28 @@ class scraper {
                 throw std::runtime_error("Unexpected HTTP status");
             }
 
-            asio::read_until(ssl_socket, response, "\r\n\r\n");
+            asio::read_until(ssl_socket, response, "\r\n\r\n", ec);
+            if (ec) {
+                std::cerr << "Network error: could not read the HTTP headers from "
+                          << host << ". The site may be unreachable or reset the connection. "
+                          << "Details: " << ec.message() << std::endl;
+                throw std::runtime_error("Unable to reach " + host + " while reading the HTTP headers");
+            }
 
             std::string header_line;
             while (std::getline(response_stream, header_line) && header_line != "\r") {
             }
 
-            asio::error_code ec;
-            asio::read(ssl_socket, response, asio::transfer_all(), ec);
-            if (ec == asio::ssl::error::stream_truncated || ec == asio::error::eof) {
-                ec.clear();
+            asio::error_code body_ec;
+            asio::read(ssl_socket, response, asio::transfer_all(), body_ec);
+            if (body_ec == asio::ssl::error::stream_truncated || body_ec == asio::error::eof) {
+                body_ec.clear();
             }
-            if (ec) {
-                throw asio::system_error(ec);
+            if (body_ec) {
+                std::cerr << "Network error: could not read the response body from "
+                          << host << ". The site may be unreachable or reset the connection. "
+                          << "Details: " << body_ec.message() << std::endl;
+                throw std::runtime_error("Unable to reach " + host + " while reading the response body");
             }
 
             return std::string(asio::buffers_begin(response.data()), asio::buffers_end(response.data()));
@@ -365,8 +381,15 @@ class scraper {
             for (const QuerySpec& query : queries) {
                 std::string path = build_query_path(query, announce, close, include_cDateF);
                 std::cout << "\nQuery: " << query.label << "\n";
-                std::string body = perform_request(path);
-                results.push_back(parse_response(query, body));
+                try {
+                    std::string body = perform_request(path);
+                    results.push_back(parse_response(query, body));
+                } catch (const std::exception& e) {
+                    std::cerr << "Query failed for " << query.label << ": " << e.what() << std::endl;
+                    QueryResult failed_result;
+                    failed_result.query = query;
+                    results.push_back(failed_result);
+                }
             }
 
             print_results();
