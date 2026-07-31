@@ -79,13 +79,26 @@ jobs:
           message["Subject"] = subject
           message.set_content(body if body.strip() else "No results returned.", subtype="plain", charset="utf-8")
 
+          print(f"SMTP host={host} port={port}")
+          print(f"SMTP STARTTLS={os.environ.get('SMTP_STARTTLS', '1')}")
+          print(f"Email from={sender}")
+          print(f"Email to={recipient}")
+          print(f"Email subject={subject}")
+          print(f"Email body length={len(body)}")
+
           context = ssl.create_default_context()
           try:
-              with smtplib.SMTP(host, port, timeout=10) as client:
+              with smtplib.SMTP(host, port, timeout=30) as client:
+                  client.set_debuglevel(1)
+                  client.ehlo()
                   if os.environ.get("SMTP_STARTTLS", "1") == "1":
+                      print("Starting TLS")
                       client.starttls(context=context)
+                      client.ehlo()
                   if username:
+                      print("Attempting SMTP login")
                       client.login(username, password)
+                  print("Sending message")
                   client.send_message(message)
                   print("Email sent successfully")
           except Exception as e:
