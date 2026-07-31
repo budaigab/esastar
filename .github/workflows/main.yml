@@ -60,7 +60,9 @@ jobs:
           import os
           import smtplib
           import ssl
+          from datetime import datetime, timezone
           from email.message import EmailMessage
+          from email.utils import format_datetime
           from pathlib import Path
 
           host = os.environ["SMTP_HOST"]
@@ -74,10 +76,13 @@ jobs:
           body = body.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "\r\n")
 
           message = EmailMessage()
+          message["Date"] = format_datetime(datetime.now(timezone.utc))
+          message["Message-ID"] = f"<esa-github-action-{int(datetime.now(timezone.utc).timestamp())}@github-actions.local>"
           message["From"] = sender
           message["To"] = recipient
           message["Subject"] = subject
           message.set_content(body if body.strip() else "No results returned.", subtype="plain", charset="utf-8")
+          message["X-Diagnostic-Source"] = "ESA Tender Scrape GitHub Action"
 
           print(f"SMTP host={host} port={port}")
           print(f"SMTP STARTTLS={os.environ.get('SMTP_STARTTLS', '1')}")
@@ -85,6 +90,7 @@ jobs:
           print(f"Email to={recipient}")
           print(f"Email subject={subject}")
           print(f"Email body length={len(body)}")
+          print(f"Message-ID={message['Message-ID']}")
 
           context = ssl.create_default_context()
           try:
@@ -105,3 +111,4 @@ jobs:
               print(f"Error sending email: {e}")
               raise
           PY
+
